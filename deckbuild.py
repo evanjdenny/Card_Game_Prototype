@@ -99,6 +99,11 @@ class Deck:
         self.card_min = 40
         self.card_faction = None
 
+    def add_cards(self, *cards: Card):
+        """Add multiple cards to the Deck."""
+        for item in cards:
+            self.cards.append(item)
+
     def add_card(self, card: Card):
         """Add a Card to the Deck"""
         self.cards.append(card)
