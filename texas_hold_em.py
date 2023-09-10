@@ -4,6 +4,7 @@ import os
 import time
 import random
 
+ ### CHIPS ###
 class Chips:
     """Chips for playing Poker games."""
     def __init__(self, player, table, starting_chip_value: int | float):
@@ -18,9 +19,13 @@ class Chips:
         """Add the final current bet to the Player's bet."""
         self.table.pool.add_player_bet(self.player.name, self.current_bet_final)
 
-    def reset_current_bet_final(self):
-        """Reset the Player's final current bet to 0."""
+    def reset_bets(self):
+        """Reset the Player's bets to 0 and set the last bet based
+        on the previous final current bet."""
+        self.last_bet = 0 + self.current_bet_final
+        self.table.pool.player_bets[self.player.name] = 0
         self.current_bet_final = 0
+        self.current_bet_draft = 0
 
     def set_bet(self, amount: int | float):
         """Set bet and confirm."""
@@ -35,6 +40,7 @@ class Chips:
             print('Invalid selection!')
             self.set_bet(amount)
 
+ ### POOL ###
 class Pool:
     """Chip Pool."""
     def __init__(self, blinds: int | float):
@@ -66,6 +72,7 @@ class Pool:
         else:
             print('BET must be greater than current CALL.')
 
+ ### SUIT ###
 class Suit(Enum):
     """Card suits"""
     SPADES = 0
@@ -73,6 +80,7 @@ class Suit(Enum):
     DIAMONDS = 2
     CLUBS = 3
 
+ ### CARD ###
 class Card:
     """Cards"""
     suits = (Suit.SPADES, Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS)
@@ -91,7 +99,7 @@ class Card:
     def change_value(self, new_value: str | int):
         """Change the value of the card."""
         if isinstance(new_value, int):
-            if new_value >= 0 and new_value <
+            if 0 <= new_value < 14:
                 self.value = self.values[new_value]
         elif isinstance(new_value, str):
             for value in self.values:
@@ -100,6 +108,7 @@ class Card:
                     return
             raise ValueError('Entered value does not match available')
 
+ ### DECK ###
 class Deck:
     """Deck of Cards"""
     def __init__(self):
@@ -124,14 +133,33 @@ class Deck:
         random.shuffle(self.cards)
         return self
 
+ ### PLAYER TEXAS HOLD'EM ###
 class PlayerTexasHoldEm:
     """Player"""
+    name = None
     hand = (None,None)
     table = None
+    chips = 0
     points = 0
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, table = None, starting_chips: int | float = 100):
         self.name = name
+        self.table = table
+        self.chips = Chips(self, self.table, starting_chips)
+
+    def raise_bet(self, new_bet: int | float):
+        """Raise the bet on the Table."""
+        if self.check_table():
+            pool = self.table.pool
+            pool.player_bets[self.name] = new_bet - pool.player_bets[self.name]
+            print(f'{self.name} raises a bet of ${pool.player_bets[self.name]}.')
+        else:
+            self.check_table_error()
+
+    def check_table_error(self):
+        """Raise LookupError if check_table method fails."""
+        raise LookupError("""Method check_table() failed. Make sure table attribute
+                          contains source Player in its players attribute.""")
 
     def check_table(self):
         """Check if Player is a member of the Table they're playing on."""
@@ -145,9 +173,9 @@ class PlayerTexasHoldEm:
         pool = self.table.pool
         if self.check_table():
             pool.add_player_bet(pool.call_value-pool.player_bets[self.name])
+            print(f'{self.name} calls.')
         else:
-            raise LookupError("""Method check_table() failed. Make sure table attribute
-                              contains source Player in its players attribute.""")
+            self.check_table_error()
 
     def set_table(self, new_table):
         """Set the Table the Player is playing on."""        
@@ -176,11 +204,15 @@ class PlayerTexasHoldEm:
         time.sleep(1.5)
         os.system('clear')
 
+ ### TABLE ###
 class Table:
     """Table for playing card games/Dealer"""
-    def __init__(self, deck: Deck, players: list):
+    def __init__(self, deck: Deck, players: list | None = None):
         self.deck = deck
         self.players = players
+        if self.players is not None:
+            for player in self.players:
+                player.set_table(self)
         self.pool = Pool(10)
         self.revealed_cards = []
 
@@ -231,6 +263,7 @@ class Table:
         for player in self.players:
             player.discard_hand(self.deck.cards)
 
+ ### TEXAS HOLD'EM POINTS ###
 class TexasHoldEmPoints:
     """Point system for figuring out who wins a hand"""
     points = 0
