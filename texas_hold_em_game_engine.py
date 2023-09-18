@@ -1,5 +1,6 @@
 """Texas Hold'Em Game Engine"""
 from texas_hold_em import *
+from collections import deque
 
 class Menu:
     """Menu system for starting and running Texas Hold'Em."""
@@ -94,6 +95,25 @@ class TexasHoldEmEngine:
             ], 'Enter the NUMBER of the Player to remove: ')
         self.add_remove_players_boolean = True
         self.create_players_list()
+        self.select_option_menu = Menu([
+            'Choose your action:',
+            '1. Check/Call',
+            '2. Raise Bet',
+            '3. Fold',
+            '4. Peek Cards'
+        ], '> ')
+        self.revealed_cards_menu = Menu([
+            'Revealed Cards:',
+            self.table.revealed_cards_string
+        ])
+        self.players_list_play = Menu([
+            'Players:',
+            self.players_list_menu_submenu
+        ])
+        self.turn = None
+        self.first_player = self.players[0]
+        self.queue = deque(self.players)
+        self.round = 0
 
     def play_game(self):
         """Start the game."""
@@ -108,9 +128,92 @@ class TexasHoldEmEngine:
         """Stop the game."""
         self.game_running = False
 
+    def create_revealed_cards_string(self):
+        """Create Revealed Cards string and recreate the Revealed Cards Menu."""
+        self.table.create_revealed_cards_string()
+        self.revealed_cards_menu = Menu([
+            'Revealed Cards:',
+            self.table.revealed_cards_string
+        ])
+
+    def create_new_queue(self):
+        """Create a new turn queue for the new list of players."""
+        self.queue = deque(self.players)
+
+    def next_turn(self):
+        """Move the current player to the back of the queue."""
+        self.queue.append(self.queue.popleft())
+
+    def print_play_menu_get_response(self):
+        """Print play menu including the Revealed Cards Menu, the Players List Menu
+        (without user input), and the Select Option Menu, and get a response to 
+        return."""
+        self.revealed_cards_menu()
+        self.players_list_play()
+        return self.select_option_menu()
+
+    def create_players_list_current_turn(self):
+        """Set the current Player's turn to the first person in the queue. Then
+        recreate the Player's List Menus, and the Player's List."""
+        self.turn = self.queue[0]
+        self.create_players_list_submenu()
+        self.create_players_list()
+
     def game_loop(self):
         """ADD CODE AS METHODS AND ATTRIBUTES ARE DEVELOPED."""
-        pass
+        self.players_list_menu()
+        self.cls()
+        while self.game_running:
+            self.table.deal_cards()
+            self.create_players_list_current_turn()
+            self.player_turn()
+            if self.turn == self.first_player and self.round == 0:
+                self.round += 1
+                if self.round == 1:
+                    self.table.reveal_three()
+                    self.create_revealed_cards_string()
+            elif self.turn == self.first_player and self.round == 1:
+                self.round += 1
+                if self.round == 2 or self.round == 3:
+                    self.table.reveal_card()
+                    self.create_revealed_cards_string()
+
+            
+    def player_turn(self):
+        """Display the Play Menu for the current Player's turn, and based on
+        the response, perform the appropriate actions."""
+        response = self.print_play_menu_get_response()
+        if response == '1':
+            self.turn.call(self.turn.name)
+            print('Player', self.turn.name, 'CALLS', self.call_value+'.')
+            self.next_turn()
+        elif response == '2':
+            self.turn.raise_bet(self.get_bet_amount())
+            self.next_turn()
+        elif response == '3':
+            self.turn.discard_cards(self.table.discard_pile)
+            print(self.turn.name, 'FOLDS.')
+            self.next_turn()
+        elif response == '4':
+            self.turn.peek_cards()
+            self.cls()
+            self.player_turn()
+        self.cls()
+
+    def get_bet_amount(self):
+        """Get the bet amount. If bet is invalid, get another bet_amount."""
+        bet_amount = input('Enter your bet: ')
+        if bet_amount == 0 or self.player_bets[self.turn.name] < self.call_value and bet_amount+self.player_bets[self.turn.name] <= self.call_value:
+            print('Invalid bet!')
+            bet_amount = self.get_bet_amount()
+        return bet_amount
+
+    def reveal_card(self):
+        """Reveal cards in three rounds."""
+        if self.round == 1:
+            self.table.reveal_three()
+        elif 3 == self.round == 2:
+            self.table.reveal_card()
 
     def menu_response(self, text):
         """Menu response that displays text to the console, waits for 1.2 seconds,
@@ -184,13 +287,20 @@ class TexasHoldEmEngine:
             'PLAYERS:',
             self.players_list_menu_submenu
         ], 'Enter the NUMBER of the Player to remove:')
+        self.players_list_play = Menu([
+            'Players:',
+            self.players_list_menu_submenu
+        ])
 
     def create_players_list_submenu(self):
         """Create list of Players for the Players List Menu."""
         players_enum = enumerate(self.players)
         self.players_list_menu_submenu = ''
         for player in players_enum:
-            self.players_list_menu_submenu += str(player[0]+1)+' '+player[1].name+'\n'
+            if player[1] == self.turn:
+                self.players_list_menu_submenu += '>>>'+str(player[0]+1)+' '+player[1].name+': $'+self.player_bets[player[1].name]+' (Chips: '+player[1].chips.chip_value+')\n'
+            else:
+                self.players_list_menu_submenu += str(player[0]+1)+' '+player[1].name+': $'+self.player_bets[player[1].name]+' (Chips: '+player[1].chips.chip_value+')\n'
 
     def remove_player(self):
         """TO BE ADDED"""
@@ -260,5 +370,7 @@ class TexasHoldEmEngine:
             while self.game_running:
                 self.game_loop()
 
-engine = TexasHoldEmEngine()
+engine = TexasHoldEmEngine([PlayerTexasHoldEm('Evan'), PlayerTexasHoldEm('Connor')])
+engine.table.set_player_table()
+engine.table.pool.add_players([PlayerTexasHoldEm('Evan'), PlayerTexasHoldEm('Connor')])
 engine.run_engine()

@@ -58,10 +58,20 @@ class Pool:
         for player in players:
             self.add_player(player)
 
+    def call(self, player: str):
+        """Call the current bet in the Pool."""
+        if self.player_bets[player] < self.call_value:
+            self.player_bets[player] = self.call_value - self.player_bets[player]
+            print(player, 'CALLS', '$'+str(self.call_value)+'.')
+        else:
+            print(player, 'CHECKS.')
+
     def add_player_bet(self, player: str, amount: int | float):
         """Increase Player bet by an amount."""
         self.player_bets[player] += amount
         self.total_value += amount
+        self.raise_bet(self.player_bets[player])
+        print(player, 'BETS', '$'+str(amount)+'.')
 
     def remove_player(self, player: str):
         """Remove Player from the Pool"""
@@ -69,13 +79,8 @@ class Pool:
             self.player_bets.pop(player)
 
     def raise_bet(self, new_bet: int | float):
-        """If new bet is greater than the current call value, set the call
-        value to the new bet value. Otherwise, inform the Player betting that
-        the bet must be greater than the current call value."""
-        if new_bet > self.call_value:
-            self.call_value = new_bet
-        else:
-            print('BET must be greater than current CALL.')
+        """Add a BET to the Pool"""
+        self.call_value = new_bet
 
  ### SUIT ###
 class Suit(Enum):
@@ -157,7 +162,8 @@ class PlayerTexasHoldEm:
         if self.check_table():
             pool = self.table.pool
             pool.player_bets[self.name] = new_bet - pool.player_bets[self.name]
-            print(f'{self.name} raises a bet of ${pool.player_bets[self.name]}.')
+            pool.raise_bet(new_bet)
+            print(f'{self.name} raises a bet of ${new_bet} for a total of ${pool.player_bets[self.name]}.')
         else:
             self.check_table_error()
 
@@ -173,14 +179,9 @@ class PlayerTexasHoldEm:
                 return True
         return False
 
-    def call(self):
+    def call(self, player):
         """Call the current bet."""
-        pool = self.table.pool
-        if self.check_table():
-            pool.add_player_bet(pool.call_value-pool.player_bets[self.name])
-            print(f'{self.name} calls.')
-        else:
-            self.check_table_error()
+        self.table.pool.call(player)
 
     def set_table(self, new_table):
         """Set the Table the Player is playing on."""        
@@ -214,12 +215,13 @@ class Table:
     """Table for playing card games/Dealer"""
     def __init__(self, deck: Deck, players = []):
         self.deck = deck
+        self.discard_pile = []
         self.players = players
         if self.players is not None:
-            for player in self.players:
-                player.set_table(self)
+            self.set_player_table()
         self.pool = Pool(10)
         self.revealed_cards = []
+        self.revealed_cards_string = ''
 
     def set_blinds(self, blinds: int | float):
         """Set blinds for beginning a hand."""
@@ -244,7 +246,6 @@ class Table:
         """Initial card reveal"""
         for i in range(3):
             self.reveal_card()
-            print(str(i+1), self.revealed_cards[i])
 
     def reveal_card_and_print(self):
         """Reveal a card and print all revealed cards to the console"""
@@ -253,6 +254,18 @@ class Table:
         print('TABLE:')
         for i in revealed:
             print(str(i[0]+1)+'.', i[1].value, i[1].suit.name)
+
+    def print_revealed_cards(self):
+        """Print each revealed card to the console."""
+        for card in self.revealed_cards:
+            print(card[0].value, card[0].suit.name)
+
+    def create_revealed_cards_string(self):
+        """Create revealed cards string for printing."""
+        cards = enumerate(self.revealed_cards)
+        self.revealed_cards_string = ''
+        for item in cards:
+            self.revealed_cards_string += item[1].value+' '+item[1].suit.name+'\n'
 
     def deal_cards(self):
         """Deal cards to each player"""
@@ -267,6 +280,11 @@ class Table:
         """Add cards from Players' hands back to the Deck on the Table"""
         for player in self.players:
             player.discard_hand(self.deck.cards)
+
+    def set_player_table(self):
+        """Set Player's table to self."""
+        for item in self.players:
+            item.set_table(self)
 
  ### TEXAS HOLD'EM POINTS ###
 class TexasHoldEmPoints:
